@@ -67,7 +67,6 @@ class OHRP():
         
         return best_weights
 
-
     def OrthoRedDim(self, X, L, k:int, d:int, r:float):
 
         self._options["k"]          = k
