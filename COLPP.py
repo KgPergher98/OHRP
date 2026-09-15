@@ -1,3 +1,27 @@
+"""
+COLPP - Class-constrained Orthogonal Locality Preserving Projections
+====================================================================
+
+Linear-algebra core shared by OHRP and S-OHRP. It builds the orthogonal,
+locality-preserving subspace onto which asset returns are projected before
+hierarchical allocation.
+
+Pipeline
+--------
+    affinity_matrix    -> heat-kernel similarity over a k-NN graph.
+                          `olpp=True`  ignores labels -> classic OLPP (OHRP)
+                          `olpp=False` honours labels -> sector-constrained (S-OHRP)
+    diagonal           -> degree matrix D of the locality graph
+    SVD / cut_on_ratio -> PCA stage, keeping a fraction `r` of the variance
+    build_weights      -> orthogonal basis, one direction at a time, each solving
+                          the LPP eigenproblem restricted to the orthogonal
+                          complement of the directions already found
+    project_data       -> maps the returns onto the resulting subspace
+
+The heat-kernel bandwidth is estimated by `find_optimal` as the mean pairwise
+Euclidean distance across all return series.
+"""
+
 import pandas
 import numpy
 
@@ -49,6 +73,7 @@ class COLPP():
             if dynamic_sum >= sum_eigen:
                 break
         d += 1
+
         U = U.iloc[:, 0 : d]
         S = S.iloc[0 : d, 0 : d]
         V = V.iloc[:, 0 : d]
@@ -59,11 +84,12 @@ class COLPP():
         # MATRIZ DE AFINIDADE ENTRE VIZINHOS DA MESMA CLASSE
         if olpp: # VERSÃO CLASSICA DO OLPP
             labels_cp *= 0
+
         Label = labels_cp.label.unique().tolist() # LABELS INDIVIDUAIS
         nLabel = len(Label)                    # NUMERO DE LABELS
         nSmp = df.shape[0]                     # TOTAL SAMPLES ON DF
         k = ops["k"]
-        if ops["NeighborMode"] == "Supervised": #TODO CRIAR VERSAO OLPP (N/SUPERVISIONADA)
+        if ops["NeighborMode"] == "NonSupervised": #TODO CRIAR VERSAO OLPP (N/SUPERVISIONADA)
             # PROCESSO SUPERVISIONADO (COM LABELS)
             if ops["WeightMode"] == "HeatKernel": # USE HEAT KERNELS
                 W = pandas.DataFrame()
@@ -75,7 +101,7 @@ class COLPP():
                     for t in range(D.shape[0]):
                         aux = D[t,:]
                         trunc = numpy.min([aux.shape[0] - 1, k]) # EVITA BUGS EM CONJUNTOS PEQUENOS
-                        if self_connection:
+                        if (self_connection) or (trunc == 0):
                             aux[aux > sorted(aux)[trunc]] = numpy.nan
                         else:
                             aux[(aux > sorted(aux)[trunc]) | (aux == 0)] = numpy.nan
@@ -86,8 +112,38 @@ class COLPP():
                         columns = classIdx
                     )
                     W = pandas.concat([W, D], axis = 1).fillna(0)
+        elif ops["NeighborMode"] == "Supervised":
+            # PROCESSO SUPERVISIONADO (COM LABELS)
+            if ops["WeightMode"] == "HeatKernel": # USE HEAT KERNELS
+                W = pandas.DataFrame()
+                # ITER OVER CLASS
+                for i in range(nLabel):
+                    classIdx = labels_cp[labels_cp.label == i].index # INDEX OF EACH LABEL
+
+                    label_data = df.copy().loc[classIdx,:]
+
+                    D = squareform(pdist(label_data, metric = "euclidean")) ** 2
+                    for t in range(D.shape[0]):
+                        aux = D[t,:]
+                        if pandas.isna(k):
+                            trunc = aux.shape[0] - 1
+                        else:
+                            trunc = numpy.min([aux.shape[0]-1, k]) # EVITA BUGS EM CONJUNTOS PEQUENOS
+                        if (self_connection) or (trunc == 0):
+                            aux[aux > sorted(aux)[trunc]] = numpy.nan
+                        else:
+                            aux[(aux > sorted(aux)[trunc]) | (aux == 0)] = numpy.nan
+                        D[t,:] = aux
+                    D = pandas.DataFrame(
+                        D, index = classIdx,
+                        columns = classIdx
+                    )
+
+                    W = pandas.concat([W, D], axis = 1).fillna(0)
+                    
         else:
             pass
+
         W = COLPP.max_with_transpose(matrix = W).reset_index(drop = True)
         W.columns = [i for i in range(W.shape[1])] # EVITA BUG FUTURO
         return W
@@ -117,7 +173,7 @@ class COLPP():
                     previous_index = eigvalue.index(ranked_eigvalue[t])
                     U[:, t] = basic_U[:, previous_index]
                 eigvalue = pandas.DataFrame(ranked_eigvalue)
-            
+
             maxEigValue = numpy.max(numpy.abs(eigvalue))
             eigvalue = eigvalue[numpy.abs(eigvalue)/maxEigValue > 1E-10]
             eigvalue = numpy.array(eigvalue.transpose().dropna(axis = 1))
@@ -142,34 +198,29 @@ class COLPP():
         else:
             ddata = X.T @ X
             ddata = COLPP.max_with_transpose(ddata)
-            #ddata[ddata.T > ddata] = ddata.T
             eigenvalues, eigenvectors = eigh(ddata)
-            eigenvalues = eigenvalues[::-1] # GREATEST TO LOWEST
-            eigenvectors = [list(i)[::-1] for i in list(eigenvectors)]
-            #
-            aux_val, aux_vec = [], []
+            eigenvalues = eigenvalues[::-1]
+            eigenvectors = numpy.asarray(eigenvectors)[:, ::-1]
+
             max_eig_val = numpy.max(numpy.abs(eigenvalues))
-            for eig_item in range(len(eigenvalues)):
-                if numpy.abs(eigenvalues[eig_item])/max_eig_val >= 1E-10:
-                    aux_val.append(eigenvalues[eig_item])
-                    aux_vec.append(eigenvectors[eig_item])
-                #else: 
-                #    pass
-            eigenvalues  = aux_val
-            eigenvectors = aux_vec
-            #eigenvectors = [i[:len(aux_val)] for i in aux_vec]
-            #
+            keep = numpy.abs(eigenvalues) / max_eig_val >= 1E-10
+            eigenvalues  = eigenvalues[keep]
+            eigenvectors = eigenvectors[:, keep]
+
             if reduced_dim > 0 and reduced_dim < len(eigenvalues):
-                eigenvalues = eigenvalues[0:reduced_dim]
-                eigenvectors = [i[0:reduced_dim] for i in eigenvectors]
-            #
-            eigenvalues_half = numpy.array(eigenvalues)**0.5
+                eigenvalues  = eigenvalues[:reduced_dim]
+                eigenvectors = eigenvectors[:, :reduced_dim]
+
+            eigenvalues_half = eigenvalues ** 0.5
             S = numpy.diag(eigenvalues_half)
             eigenvalues_minus_half = eigenvalues_half ** -1
 
-            U = eigenvectors * (eigenvalues_minus_half * numpy.ones((len(eigenvectors), len(eigenvalues_minus_half))))
+            U = eigenvectors * eigenvalues_minus_half
             U = X @ U
-            return U, pandas.DataFrame(S), pandas.DataFrame(eigenvectors)
+            V_df = pandas.DataFrame(eigenvectors)
+            if hasattr(X, 'columns') and V_df.shape[0] == X.shape[1]:
+                V_df.index = X.columns
+            return U, pandas.DataFrame(S), V_df
         
     def cholesky_with_fixed_column_signs(A, lower=True, eps=1e-12):
         """
@@ -194,38 +245,67 @@ class COLPP():
                 L[:, j] = -col
         return L
         
+    def forceArpackConvergence(df, maxiter = 5000, tol = 1e-6):
+        localMaxIter = maxiter
+        localTol     = tol
+        while True:
+            try:
+                eigV, eigVec = eigs(df.values, 1, which = "LR", v0 = numpy.ones(df.shape[0]), maxiter=localMaxIter, tol=localTol)
+                return eigV, eigVec
+            except Exception:
+                localMaxIter *= 2
+                localTol     *= 10
+
+    def adjustedCholesky(M):
+        try:
+            return cholesky(M)
+        except:
+            eigenvalues = numpy.linalg.eigvalsh(M)
+
+            if eigenvalues.min() <= 0:
+                # Fix it
+                M += (-eigenvalues.min() + 1e-8) * numpy.eye(M.shape[0])
+
+            return cholesky(M, lower=True)
+
     def build_weights(U, S, V, D, W, reduced_dim = 2, bd = True):
-        dataset = (U @ S).copy()
+        # Drop pandas labels for the pure-numeric kernel below: U may carry a
+        # ticker index (SVD's "else" branch builds U via `X @ U`), while D and
+        # the integer-relabelled W would then trigger pandas label-alignment
+        # errors in `dataset.T @ D @ dataset` even though the shapes match.
+        dataset = numpy.asarray(U @ S)
         eig_pca = V.copy()
+        D_arr   = numpy.asarray(D)
+        W_arr   = numpy.asarray(W)
+
         if bd: #TODO
-            DPrime = dataset.T @ D @ dataset
+            DPrime = pandas.DataFrame(dataset.T @ D_arr @ dataset)
         else:
-            DPrime = dataset.T @ dataset
+            DPrime = pandas.DataFrame(dataset.T @ dataset)
         DPrime = COLPP.max_with_transpose(matrix = DPrime)
 
-        WPrime = dataset.T @ W @ dataset
+        WPrime = pandas.DataFrame(dataset.T @ W_arr @ dataset)
         WPrime = COLPP.max_with_transpose(matrix = WPrime)
 
         if (reduced_dim > WPrime.shape[1]):
             reduced_dim = WPrime.shape[1]
 
-        rDPrime = cholesky(DPrime)
+        rDPrime = COLPP.adjustedCholesky(DPrime)
         #rDPrime = COLPP.cholesky_with_fixed_column_signs(DPrime)
         lDPrime = rDPrime.T
+
         Q0 = numpy.linalg.inv(rDPrime) @ (numpy.linalg.inv(lDPrime) @ WPrime)
         Q = Q0.copy()
 
         eigvector = pandas.DataFrame()
 
         for k in range(reduced_dim):
-            try:
-                eigV, eigVec = eigs(Q.values, 1, which = "LR", v0 = numpy.ones(Q.shape[0]))
-            except Exception as exc:
-                eigV, eigVec = eigs(Q.values, 1, which = "LR", v0 = numpy.ones(Q.shape[0]), maxiter=5000, tol=1e-6)
+
+            eigV, eigVec = COLPP.forceArpackConvergence(df = Q, maxiter = 5000, tol = 1e-6)
             eigVec = numpy.real(eigVec)
             eigV = numpy.real(eigV)
 
-            if numpy.abs(eigV[-1]) < 1E-6:
+            if (numpy.abs(eigV[-1]) < 1E-6):
                 break
 
             if eigvector.empty:

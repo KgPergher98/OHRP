@@ -1,3 +1,12 @@
+"""
+RP - Risk Parity benchmark
+==========================
+
+Equal-risk-contribution portfolio built on top of riskfolio-lib, using the
+Ledoit-Wolf shrinkage covariance estimator by default. Serves as the
+low-concentration benchmark in the dissertation experiments.
+"""
+
 import pandas
 import numpy
 import riskfolio as rp

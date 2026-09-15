@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+.venv/
+venv/
+
+# Simulation output (regenerate with simulationFund.py)
+results/*.csv
+# ...except the sensitivity tables published with the IEEE Access article
+!results/empirical_sensibility_ohrp_WL*.csv
+
+# Analysis output (regenerate with analise_experimentos.py / setores_b3.py)
+paper/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
