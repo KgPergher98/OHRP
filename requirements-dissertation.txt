@@ -1,0 +1,42 @@
+# Exact environment that produced the dissertation results
+# ---------------------------------------------------------
+# OS      : Ubuntu 24.04.2 LTS, Linux 6.8.0 x86-64, glibc 2.39
+# CPU     : Intel Core i7-14700 (28 threads)
+# Python  : 3.11.13 (Miniconda)
+# BLAS    : OpenBLAS bundled with the pip wheels, 0.3.29 in numpy and 0.3.28 in
+#           scipy, "Haswell" kernel, pthreads, 28 threads
+#
+# In this environment a rerun of simulationFund.py matched the stored results to
+# floating-point precision (largest deviation 3e-21).
+#
+# OHRP and S-OHRP are numerically sensitive to the platform: on other operating
+# systems the same code and package versions run fine but select different
+# (k, d, r) and therefore yield different OHRP/S-OHRP portfolios. The cause is
+# traced in the "Reproducibility" section of the README. For general use on any
+# platform, requirements.txt is enough.
+
+# Core numerical stack
+numpy==2.3.0
+scipy==1.16.1
+pandas==2.3.0
+openpyxl==3.1.5
+matplotlib==3.10.3
+
+# Risk Parity benchmark (RP.py) and its solver stack
+Riskfolio-Lib==7.0.1
+cvxpy==1.7.2
+clarabel==0.11.1
+osqp==1.0.4
+scs==3.2.8
+scikit-learn==1.7.2
+statsmodels==0.14.5
+arch==7.2.0
+astropy==7.1.0
+xlsxwriter==3.2.5
+pybind11==3.0.1
+
+# IEEE Access notebooks (tutorialDataExtraction.ipynb and
+# tutorialHyperparameterSensibility.ipynb)
+yfinance==1.1.0
+seaborn==0.13.2
+requests

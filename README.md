@@ -139,6 +139,79 @@ Student's paired *t*-test reported as a secondary reference.
 
 ---
 
+## Reproducibility 🔬
+
+### Reference environment
+
+The dissertation results were produced on the machine below. `requirements-dissertation.txt` pins
+the Python packages.
+
+| | |
+|---|---|
+| OS | Ubuntu 24.04.2 LTS, Linux 6.8.0, x86-64, glibc 2.39 |
+| CPU | Intel Core i7-14700, 28 threads |
+| Python | 3.11.13 (Miniconda) |
+| Packages | numpy 2.3.0, scipy 1.16.1, pandas 2.3.0, scikit-learn 1.7.2, Riskfolio-Lib 7.0.1, cvxpy 1.7.2 |
+| BLAS / LAPACK | OpenBLAS bundled with the pip wheels: 0.3.29 in numpy, 0.3.28 in scipy; `Haswell` kernel, pthreads, 28 threads |
+
+Rerunning `simulationFund.py` there reproduced the stored results to floating-point precision
+(largest deviation 3e-21 over the first two rebalancings of both experiments, all six strategies).
+
+```bash
+pip install -r requirements-dissertation.txt   # reference environment (Linux x86-64, Python 3.11)
+pip install -r requirements.txt                # any platform, compatible recent versions
+```
+
+`requirements.txt` excludes pandas 3, which changes how returns are computed across price gaps.
+
+### Why OHRP and S-OHRP depend on the platform
+
+EW and HRP produce identical portfolios on every platform tested, and RP agrees within its
+optimizer tolerance (1e-5). OHRP and S-OHRP do not: on Windows 11 (Intel Core i7-12700H) with
+**exactly the same package and OpenBLAS versions**, they select different `(k, d, r)` from the first
+rebalancing onwards. The cause was traced stage by stage on that first rebalancing (2011-01-03,
+WL = 1 year), using the combinations the dissertation selected there: OHRP `(7, 10, 0.96)` and
+S-OHRP `(5, 25, 0.98)`.
+
+1. **Inputs are identical.** Returns, heat-kernel bandwidth, affinity matrix and degree matrix agree
+   to 3e-17.
+2. **PCA stage: eigenvector signs.** `COLPP.SVD` calls LAPACK's general eigensolver
+   (`scipy.linalg.eig`) on XXᵀ. Eigenvalues agree to 1e-15 and eigenvectors to 6e-14, except
+   for their sign, which is mathematically arbitrary and chosen differently by each platform's
+   build: 19 of the 51 retained eigenvectors come back flipped.
+3. **ARPACK stage.** `COLPP.build_weights` extracts the OLPP directions one at a time with ARPACK
+   (`scipy.sparse.linalg.eigs`, `k=1`, `which="LR"`, `tol=1e-6`, starting vector `v0` = all ones).
+   The flipped PCA basis hands ARPACK the same matrix in different coordinates (identical after
+   undoing the flips, 1e-14). The fixed starting vector is not invariant to that change, so the
+   iterations follow a different path. For OHRP, eigenvalues still agree to 1e-8 and eigenvectors to
+   8e-7, within the tolerance, but 3 of the 10 projected dimensions come out with opposite sign.
+4. **HRP turns signs into different weights.** HRP clusters assets by the Pearson correlation of
+   their projected coordinates. That correlation removes the mean across dimensions, so it is not
+   invariant to flipping one dimension for all assets. The flips change the correlation matrix by up
+   to 0.65 and the HRP weights by up to 6.8 percentage points. After aligning the column signs, the
+   OHRP weights agree to 1e-7: for OHRP the divergence is entirely the sign ambiguity, not rounding.
+   `HRP.py` itself is platform-consistent, since it returns the same weights on both systems when
+   given the same projection.
+5. **S-OHRP adds non-unique eigenvectors.** With intra-sector edges only, the locality graph splits
+   into disconnected components (10 in this window, one per sector). The leading eigenvalue of the
+   OLPP problem becomes repeated: the first six ARPACK eigenvalues equal 1 to within 2e-7. The
+   eigenvectors of a repeated eigenvalue are not unique, ARPACK returns a different basis of that
+   eigenspace on each platform, and the projections still differ by up to 0.15 after sign
+   alignment. The OHRP graph is connected and its eigenvalues are well separated (smallest relative
+   gap 4%).
+6. **The grid search picks another winner.** In-sample volatility moves by 2.5e-5 (OHRP) and 2.9e-4
+   (S-OHRP), while the best `(k, d, r)` candidates are often within a fraction of a percent of each
+   other. The selection changes, and from then on the whole portfolio path differs.
+
+Package versions matter on their own as well: on the same Windows machine, moving from scipy 1.16
+to scipy 1.17 already changes the combinations OHRP and S-OHRP select, whereas numpy 1.26 versus
+2.4 makes no difference for OHRP.
+
+In practice, the code runs on any platform and the methods behave as described in the dissertation,
+but only the reference environment reproduces its exact OHRP and S-OHRP figures.
+
+---
+
 ## Data 💾
 
 Everything under `datasets/` is freely available data, pre-processed into ready-to-use matrices.

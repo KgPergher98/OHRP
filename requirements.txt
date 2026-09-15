@@ -1,5 +1,9 @@
 # Core numerical stack
-pandas>=2.0
+# pandas 3 changes how returns are computed across price gaps and breaks the
+# label handling of OHRP/S-OHRP, so it is excluded.
+# For the exact environment that produced the dissertation results, use
+# requirements-dissertation.txt instead (see "Reproducibility" in the README).
+pandas>=2.0,<3
 numpy>=1.24
 scipy>=1.10
 
