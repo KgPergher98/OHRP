@@ -73,8 +73,9 @@ class SOHRP():
     def run(self, X, L, k:list = [5], d:list = [10], r:list = [0.9], optimize_metric:str = "volatility"):
 
         self.X = X.copy()
-        self._options["t"] = COLPP.find_optimal(df = self.X)
         self.X = self.X.transpose()
+        # u = mean Euclidean distance between the N assets (rows after the transpose)
+        self._options["t"] = COLPP.find_optimal(df = self.X)
 
         # Adjust Labels
         if type(L) != pandas.DataFrame:

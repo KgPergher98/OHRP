@@ -40,22 +40,22 @@ weighted portfolio scores a perfect `Gini = 0.00` and still lands at `SGI ≈ 0.
 
 ## Out-of-sample results 📊
 
-Cumulative returns of the six strategies at the one-year estimation window, the point where
-S-OHRP reaches the best risk-adjusted performance of the whole study. Solid lines are gross of
-costs, dashed lines net of 3 bps per rebalancing.
+Cumulative returns of the six strategies at the 1.2-year estimation window, where S-OHRP reaches
+the best risk-adjusted performance of the whole study. Solid lines are gross of costs, dashed
+lines net of 3 bps per rebalancing.
 
-![Cumulative returns, WL = 1.00 year](docs/img/cumulative_returns_WL_1.00.png)
+![Cumulative returns, WL = 1.20 years](docs/img/cumulative_returns_WL_1.20.png)
 
 Headline findings from the dissertation, over 158 Brazilian stocks from January 2011 to
-February 2026:
+February 2026 (composed ratios net of costs):
 
 | | Result |
 |---|---|
-| **OHRP, risk** | Lowest annualized volatility at **every** window length tested (0.140–0.151, against 0.160–0.170 for HRP and ≈0.201 for EW), with a clean sweep of **27 out of 27** Wilcoxon comparisons, plus complete dominance in maximum drawdown and Pain Index |
-| **OHRP, return** | Best cost-adjusted Sharpe ratio at seven of the nine long windows, peaking at 0.346 (WL = 2.5y) |
-| **S-OHRP** | Best risk-adjusted performance of the entire study at WL = 1.00 year: Sharpe 0.381, Sortino 0.366 |
-| **The price** | OHRP is the most concentrated (Gini 0.70–0.73) and most active (roughly twice the HRP turnover) |
-| **SGI** | Risk Parity is the most sector-diversified strategy in every scenario (25/25 wins per regime); OHRP never wins a single SGI comparison, despite looking diversified at the asset level |
+| **OHRP, risk** | Statistically significant lower volatility, smaller maximum drawdowns and lower Pain Index than HRP, RP and EW at every one of the nine long windows (1 to 5 years). Volatility of 0.158–0.169 across all windows tested, against 0.177–0.188 for HRP and ≈0.222 for EW |
+| **OHRP, return** | Best Sharpe ratio at eight of the nine long windows, peaking at 0.343 (WL = 4.5 years) |
+| **S-OHRP** | Best risk-adjusted performance of the entire study, Sharpe 0.482 at WL = 1.2 years, and the highest average over the short windows (0.327, against 0.255 for OHRP and 0.259 for HRP). S-OHRP (Vol) nearly matches it from 1.2 years on |
+| **The price** | OHRP is the most concentrated at the asset level (Gini ≈ 0.70) and trades more than twice as much as HRP. S-OHRP trades even more |
+| **SGI** | Risk Parity is the most sector-diversified strategy at every window. OHRP and, above all, S-OHRP concentrate their weight in few sectors, despite looking diversified at the asset level |
 
 The investable universe, 158 tickers across 10 B3 economic sectors:
 
@@ -82,22 +82,19 @@ tutorialSimpleOHRP.py        ① one window, every strategy, inspect the weights
 tutorialSimulation.py        ② how the backtest works + a reduced-scale run
 tutorialAnalysis.py          ③ how to turn results/ into figures and tables
 
-tutorialDataExtraction.ipynb             IEEE Access article: download prices and SELIC
-tutorialHyperparameterSensibility.ipynb  IEEE Access article: out-of-sample sensitivity to (k, d)
+tutorialDataExtraction.ipynb  how the price matrix and the SELIC series are downloaded
 
 datasets/                    price, sector and risk-free data (see below)
-results/                     simulation output — regenerated, not versioned (except the
-                             sensitivity tables of the IEEE Access article)
+results/                     simulation output behind every table and figure of the
+                             dissertation, with the (k, d, r) selected at each rebalancing
 docs/img/                    figures used by this README
 ```
 
 The tutorials are plain `.py` files organised in `#%%` cells, so VS Code, Spyder and PyCharm all
 render them as interactive notebooks while they stay readable in a plain diff.
 
-The two notebooks come from the *IEEE Access* article and are kept as published.
-`tutorialDataExtraction.ipynb` shows how the price matrix is built from Yahoo Finance and the SELIC
-from the Brazilian Central Bank; `tutorialHyperparameterSensibility.ipynb` evaluates OHRP
-out-of-sample over a grid of hyperparameters and reads its tables from `results/`.
+`tutorialDataExtraction.ipynb` shows how the price matrix is built from Yahoo Finance and the
+SELIC from the Brazilian Central Bank.
 
 ---
 
@@ -114,10 +111,20 @@ confirms the environment is sound.
 
 ### Reproducing the dissertation
 
+`results/` already holds the simulation output behind every table and figure of the dissertation,
+so the analysis can be rerun straight away:
+
 ```bash
-python simulationFund.py        # fills results/ — hours, not minutes
-python analise_experimentos.py  # run once per experiment (set the flag at the top)
+python analise_experimentos.py 1   # ExperimentoSOHRP: writes paper/figures and paper/tables
+python analise_experimentos.py 2   # ExperimentoOHRP
 python setores_b3.py
+```
+
+To recompute the simulation itself, fix the number of BLAS threads at one (see below) and run:
+
+```bash
+export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 NUMEXPR_NUM_THREADS=1
+python simulationFund.py
 ```
 
 `simulationFund.py` runs both experiments:
@@ -127,13 +134,15 @@ python setores_b3.py
 | `ExperimentoSOHRP` | S-OHRP, S-OHRP (Vol), OHRP, HRP, EW, RP | 0.20 … 2.00 years, step 0.20 |
 | `ExperimentoOHRP` | OHRP, HRP, EW, RP | 1.0 … 5.0 years, step 0.5 |
 
-It skips any window length whose output already exists, so an interrupted run can simply be
-relaunched. Be warned that the hyperparameter grid is 7 × 7 × 5 = 245 projections per method, per
-rebalancing date.
+It skips any window length whose output already exists in `results/`, so remove the
+corresponding `*_Ms_*` and `*_Ts_*` files to recompute a window, and an interrupted run can simply
+be relaunched. The hyperparameter grid is 7 × 7 × 5 = 245 projections per method and rebalancing
+date, and reproducing both experiments takes on the order of 80 CPU-hours on the reference machine.
 
 **Protocol.** 158 Brazilian stocks (IBOV + SMLL) across 10 B3 sectors, January 2011 to February
 2026, rolling windows of `WL × 252` trading days, 42-day holding periods giving 89 out-of-sample
-portfolios per configuration, a 90% minimum-observation filter, 3 bps of transaction cost, and
+portfolios per configuration, the grid `k ∈ {1, 3, …, 13}`, `d ∈ {5, 10, …, 35}`,
+`r ∈ {0.92, 0.94, …, 1.00}`, a 90% minimum-observation filter, 3 bps of transaction cost, and
 SELIC as the risk-free rate. Pairwise comparisons use the Wilcoxon signed-rank test at 95%, with
 Student's paired *t*-test reported as a secondary reference.
 
@@ -149,13 +158,16 @@ the Python packages.
 | | |
 |---|---|
 | OS | Ubuntu 24.04.2 LTS, Linux 6.8.0, x86-64, glibc 2.39 |
-| CPU | Intel Core i7-14700, 28 threads |
+| CPU | Intel Core i7-14700 |
 | Python | 3.11.13 (Miniconda) |
 | Packages | numpy 2.3.0, scipy 1.16.1, pandas 2.3.0, scikit-learn 1.7.2, Riskfolio-Lib 7.0.1, cvxpy 1.7.2 |
-| BLAS / LAPACK | OpenBLAS bundled with the pip wheels: 0.3.29 in numpy, 0.3.28 in scipy; `Haswell` kernel, pthreads, 28 threads |
+| BLAS / LAPACK | OpenBLAS bundled with the pip wheels: 0.3.29 in numpy, 0.3.28 in scipy; `Haswell` kernel |
+| BLAS threads | 1 |
 
-Rerunning `simulationFund.py` there reproduced the stored results to floating-point precision
-(largest deviation 3e-21 over the first two rebalancings of both experiments, all six strategies).
+In that environment the code reproduces `results/` exactly: OHRP, S-OHRP and S-OHRP (Vol)
+recomputed from scratch at rebalancing dates spread over the whole sample select the same
+`(k, d, r)` and the same weights, and the simulation output matches the stored files to the last
+digit.
 
 ```bash
 pip install -r requirements-dissertation.txt   # reference environment (Linux x86-64, Python 3.11)
@@ -164,51 +176,29 @@ pip install -r requirements.txt                # any platform, compatible recent
 
 `requirements.txt` excludes pandas 3, which changes how returns are computed across price gaps.
 
-### Why OHRP and S-OHRP depend on the platform
+### Why the number of threads and the platform matter
 
-EW and HRP produce identical portfolios on every platform tested, and RP agrees within its
-optimizer tolerance (1e-5). OHRP and S-OHRP do not: on Windows 11 (Intel Core i7-12700H) with
-**exactly the same package and OpenBLAS versions**, they select different `(k, d, r)` from the first
-rebalancing onwards. The cause was traced stage by stage on that first rebalancing (2011-01-03,
-WL = 1 year), using the combinations the dissertation selected there: OHRP `(7, 10, 0.96)` and
-S-OHRP `(5, 25, 0.98)`.
+OHRP and S-OHRP select `(k, d, r)` by comparing in-sample objectives that often differ by a
+fraction of a percent among the best candidates, so the selection is sensitive to perturbations at
+the level of machine precision. A multithreaded BLAS splits sums and matrix products among threads
+and combines the partial results in an order that depends on the number of threads. The
+eigensolvers of the projection inherit these rounding differences, which can flip the sign of an
+eigenvector (an arbitrary choice from the mathematical point of view) or, in S-OHRP, select a
+different basis of an eigenspace with repeated eigenvalues, since its sector-restricted graph has
+one connected component per sector. HRP clusters the projected coordinates by Pearson
+correlation, which is not invariant to such sign changes, so a different `(k, d, r)` can win the
+grid search, and from that rebalancing date onwards the whole portfolio path differs.
 
-1. **Inputs are identical.** Returns, heat-kernel bandwidth, affinity matrix and degree matrix agree
-   to 3e-17.
-2. **PCA stage: eigenvector signs.** `COLPP.SVD` calls LAPACK's general eigensolver
-   (`scipy.linalg.eig`) on XXᵀ. Eigenvalues agree to 1e-15 and eigenvectors to 6e-14, except
-   for their sign, which is mathematically arbitrary and chosen differently by each platform's
-   build: 19 of the 51 retained eigenvectors come back flipped.
-3. **ARPACK stage.** `COLPP.build_weights` extracts the OLPP directions one at a time with ARPACK
-   (`scipy.sparse.linalg.eigs`, `k=1`, `which="LR"`, `tol=1e-6`, starting vector `v0` = all ones).
-   The flipped PCA basis hands ARPACK the same matrix in different coordinates (identical after
-   undoing the flips, 1e-14). The fixed starting vector is not invariant to that change, so the
-   iterations follow a different path. For OHRP, eigenvalues still agree to 1e-8 and eigenvectors to
-   8e-7, within the tolerance, but 3 of the 10 projected dimensions come out with opposite sign.
-4. **HRP turns signs into different weights.** HRP clusters assets by the Pearson correlation of
-   their projected coordinates. That correlation removes the mean across dimensions, so it is not
-   invariant to flipping one dimension for all assets. The flips change the correlation matrix by up
-   to 0.65 and the HRP weights by up to 6.8 percentage points. After aligning the column signs, the
-   OHRP weights agree to 1e-7: for OHRP the divergence is entirely the sign ambiguity, not rounding.
-   `HRP.py` itself is platform-consistent, since it returns the same weights on both systems when
-   given the same projection.
-5. **S-OHRP adds non-unique eigenvectors.** With intra-sector edges only, the locality graph splits
-   into disconnected components (10 in this window, one per sector). The leading eigenvalue of the
-   OLPP problem becomes repeated: the first six ARPACK eigenvalues equal 1 to within 2e-7. The
-   eigenvectors of a repeated eigenvalue are not unique, ARPACK returns a different basis of that
-   eigenspace on each platform, and the projections still differ by up to 0.15 after sign
-   alignment. The OHRP graph is connected and its eigenvalues are well separated (smallest relative
-   gap 4%).
-6. **The grid search picks another winner.** In-sample volatility moves by 2.5e-5 (OHRP) and 2.9e-4
-   (S-OHRP), while the best `(k, d, r)` candidates are often within a fraction of a percent of each
-   other. The selection changes, and from then on the whole portfolio path differs.
+Running the same code on the same machine with all 28 hardware threads and with a single thread,
+HRP, RP and EW agreed to within 4e-7, whereas the composed Sharpe ratio of OHRP and S-OHRP at an
+individual window changed by a median of about 0.02 and by up to about 0.08 for OHRP and 0.17 for
+S-OHRP. Averaged over the windows of each experiment, the changes largely cancel out. The same
+mechanism explains why results differ across operating systems and across versions of the
+numerical libraries, even with identical code.
 
-Package versions matter on their own as well: on the same Windows machine, moving from scipy 1.16
-to scipy 1.17 already changes the combinations OHRP and S-OHRP select, whereas numpy 1.26 versus
-2.4 makes no difference for OHRP.
-
-In practice, the code runs on any platform and the methods behave as described in the dissertation,
-but only the reference environment reproduces its exact OHRP and S-OHRP figures.
+In practice, the code runs on any platform and the methods behave as described in the
+dissertation, but only the reference environment with a single BLAS thread reproduces its exact
+OHRP and S-OHRP figures.
 
 ---
 
@@ -221,10 +211,10 @@ Everything under `datasets/` is freely available data, pre-processed into ready-
 | `BR_equity_closing_prices.csv` | Daily adjusted closing prices, 158 tickers plus the IBOV and SELIC columns, 2002-01-01 to 2026-01-29. The dissertation uses the slice from 2011-01-03 onwards. |
 | `SectoralBrazilianClassification.xlsx` | B3 economic sector for each ticker, matched by its reduced (4-letter) form |
 | `SELIC_returns.csv` | Brazilian base interest rate, used as the risk-free benchmark |
-| `IBOV_23-10-25.csv`, `SMLL_23-10-25.csv` | IBOV and Small Caps composition as of 2025-10-23 (ticker, Yahoo symbol, firm name, weight), used by the *IEEE Access* notebooks |
-| `IBOV_equity_closing_prices.csv` | Daily closing prices of the IBOV constituents, 2010-01-04 to 2025-10-22, produced by `tutorialDataExtraction.ipynb` and read by `tutorialHyperparameterSensibility.ipynb` |
+| `IBOV_23-10-25.csv`, `SMLL_23-10-25.csv` | IBOV and Small Caps composition as of 2025-10-23 (ticker, Yahoo symbol, firm name, weight), used by `tutorialDataExtraction.ipynb` |
+| `IBOV_equity_closing_prices.csv` | Daily closing prices of the IBOV constituents, 2010-01-04 to 2025-10-22, produced by `tutorialDataExtraction.ipynb` |
 
-Only the data needed to replicate the dissertation and the *IEEE Access* tutorials is included
+Only the data needed to replicate the dissertation and the data extraction notebook is included
 here. The fundamentals database used in a separate line of experiments is deliberately left out.
 
 ---

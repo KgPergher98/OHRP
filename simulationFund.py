@@ -273,12 +273,6 @@ def run_experiment(name, strategies, window_lengths):
 
                     temporaryData["out_sample_returns"][strategy] = returns
 
-                    # Necessary to apply costs - the more a strategy gains the more it costs will be relevant
-                    if portfolios['out_sample_returns_with_cost'][strategy].empty:
-                        accumulatedReturns = 1
-                    else:
-                        accumulatedReturns = (1 + portfolios['out_sample_returns_with_cost'][strategy]).cumprod().iloc[-1]
-
                     measures = calculateData(
                         series = temporaryData['out_sample_returns'][strategy],
                         weights = temporaryData['weights'][strategy],
@@ -288,7 +282,8 @@ def run_experiment(name, strategies, window_lengths):
                     )
 
                     # Unbiasing the initial turnover - all portfolios start from zero in the same condition, so the first turnover is not relevant for comparison
-                    cost = 2 * measures['Turnover Ratio'].values[0] * transaction_cost * accumulatedReturns
+                    # Eq. 2.2: cost = c * sum |dw|, charged as a return on the first day of the period
+                    cost = 2 * measures['Turnover Ratio'].values[0] * transaction_cost
                     if t == initialTime:
                         measures['Turnover Ratio'] = numpy.nan
 

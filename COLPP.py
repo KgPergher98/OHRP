@@ -64,15 +64,14 @@ class COLPP():
         )
     
     def cut_on_ratio(U, S, V, pca_ratio = 1.0):
-        eigenvalue_pca =  numpy.diag(S)
-        sum_eigen = numpy.sum(eigenvalue_pca)
-        sum_eigen *= pca_ratio
-        dynamic_sum = 0
-        for d in range(len(eigenvalue_pca)):
-            dynamic_sum += eigenvalue_pca[d]
-            if dynamic_sum >= sum_eigen:
-                break
-        d += 1
+        # S holds singular values, so the variance of each component is its square.
+        # d is the largest number of components whose cumulative variance is at most
+        # pca_ratio of the total, and at least 1.
+        variance = numpy.diag(S) ** 2
+        cumulative = numpy.cumsum(variance)
+        target = pca_ratio * cumulative[-1]
+        d = int(numpy.sum(cumulative <= target * (1 + 1e-12)))
+        d = max(d, 1)
 
         U = U.iloc[:, 0 : d]
         S = S.iloc[0 : d, 0 : d]
@@ -106,8 +105,9 @@ class COLPP():
                         else:
                             aux[(aux > sorted(aux)[trunc]) | (aux == 0)] = numpy.nan
                         D[t,:] = aux
+                    # heat kernel exp(-||x_n - x_n'||^2 / u), with u = ops["t"]
                     D = pandas.DataFrame(
-                        numpy.e**((-1 * D)/(2*(ops["t"]**2))),
+                        numpy.e**((-1 * D)/ops["t"]),
                         index = classIdx,
                         columns = classIdx
                     )
@@ -134,8 +134,10 @@ class COLPP():
                         else:
                             aux[(aux > sorted(aux)[trunc]) | (aux == 0)] = numpy.nan
                         D[t,:] = aux
+                    # same heat kernel as OHRP, restricted to each sector
                     D = pandas.DataFrame(
-                        D, index = classIdx,
+                        numpy.e**((-1 * D)/ops["t"]),
+                        index = classIdx,
                         columns = classIdx
                     )
 
@@ -144,7 +146,9 @@ class COLPP():
         else:
             pass
 
-        W = COLPP.max_with_transpose(matrix = W).reset_index(drop = True)
+        # W is built sector by sector; realign it to the row order of df
+        W = COLPP.max_with_transpose(matrix = W)
+        W = W.loc[list(df.index), list(df.index)].reset_index(drop = True)
         W.columns = [i for i in range(W.shape[1])] # EVITA BUG FUTURO
         return W
     

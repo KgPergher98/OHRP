@@ -18,6 +18,7 @@
 #   SOHRPvol  ->  S-OHRP (Vol)  ->  subscrito Vol (ex.: S-OHRP_Vol)
 # =============================================================================
 import os
+import sys
 from itertools import combinations
 import numpy as np
 import pandas as pd
@@ -40,12 +41,14 @@ from Measures import Measures
 EXPERIMENTS = {
     1: {'name': 'ExperimentoSOHRP',
         'wls': [round(0.2 * i, 2) for i in range(1, 11)],   # 0.20 .. 2.00
-        'grid_wls': None},                                  # grade usa os 10 WL
+        'grid_wls': None,                                   # grade usa os 10 WL
+        'ylim_top': 1400},
     2: {'name': 'ExperimentoOHRP',
         'wls': [1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0],
-        'grid_wls': [1.0, 2.0, 3.0, 4.0, 5.0]},             # grade só com anos inteiros
+        'grid_wls': [1.0, 2.0, 3.0, 4.0, 5.0],              # grade só com anos inteiros
+        'ylim_top': 1000},
 }
-EXPERIMENT_TO_RUN = 2
+EXPERIMENT_TO_RUN = int(sys.argv[1]) if len(sys.argv) > 1 else 2   # python analise_experimentos.py <1|2>
 
 EXP_PREFIX = EXPERIMENTS[EXPERIMENT_TO_RUN]['name']
 wls = EXPERIMENTS[EXPERIMENT_TO_RUN]['wls']
@@ -206,7 +209,7 @@ def plot_timeseries(wl, returns, returns_cost, save=True, show=False):
     ax.set_ylabel('Cumulative return, net of costs (base 100)')
     ax.set_xlabel('')
     ax.set_yscale('log')
-    ax.set_ylim(60, 1000)
+    ax.set_ylim(60, EXPERIMENTS[EXPERIMENT_TO_RUN]['ylim_top'])
     ax.set_yticks([50, 100, 200, 400, 800])
     ax.yaxis.set_major_formatter(plt.matplotlib.ticker.ScalarFormatter())
     ax.yaxis.set_minor_formatter(plt.matplotlib.ticker.NullFormatter())

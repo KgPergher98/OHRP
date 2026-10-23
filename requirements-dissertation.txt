@@ -35,8 +35,6 @@ astropy==7.1.0
 xlsxwriter==3.2.5
 pybind11==3.0.1
 
-# IEEE Access notebooks (tutorialDataExtraction.ipynb and
-# tutorialHyperparameterSensibility.ipynb)
+# Data extraction notebook (tutorialDataExtraction.ipynb)
 yfinance==1.1.0
-seaborn==0.13.2
 requests

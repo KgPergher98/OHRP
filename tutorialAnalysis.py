@@ -26,10 +26,10 @@ analise_experimentos.py
            paper/figures/correlacoes/         cross-strategy correlation heatmaps
            paper/tables/                      summary, Wilcoxon and t-test tables
 
-    Pick the experiment at the top of the file, in the EXPERIMENTS block:
+    Pass the experiment as the first argument:
         1 -> ExperimentoSOHRP  (short windows, six strategies)
-        2 -> ExperimentoOHRP   (long windows, four strategies)
-    Run it once per experiment; re-running overwrites the shared output folders.
+        2 -> ExperimentoOHRP   (long windows, four strategies, the default)
+    Run it once per experiment; both write into the same output folders.
 
 setores_b3.py
     Reads  datasets/BR_equity_closing_prices.csv
@@ -42,8 +42,8 @@ setores_b3.py
 Full sequence, from an empty checkout
 --------------------------------------------------------------------------
     python simulationFund.py        # hours: fills results/
-    python analise_experimentos.py  # with EXPERIMENT_TO_ANALYSE = 1
-    python analise_experimentos.py  # then with EXPERIMENT_TO_ANALYSE = 2
+    python analise_experimentos.py 1
+    python analise_experimentos.py 2
     python setores_b3.py
 """
 
